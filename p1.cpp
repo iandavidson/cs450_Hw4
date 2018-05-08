@@ -66,11 +66,19 @@ public:
 			return physicalPageNumber;
 		}
 
+		bool getPermissionBit(){
+			return permission;
+		}
+
+		bool getValidBit(){
+			return valid;
+		}
+
 	private:
 		bool valid;
 		bool permission;
 		int physicalPageNumber;
-		bool useBit;//whatever the fuck that it
+		bool useBit;
 		//whatever else we need to keep track of this information.
 	};
 
@@ -132,22 +140,51 @@ public:
 		}
 	}
 
-	int translateAddress(int virtualAddress) {
+	int translateAddress(int virtualAddress, bool hexFormat) {
 			// calculate VPN
 			// index the table
 			// offset to find specific address within PPN
 			// return PPN
 
 			int mask = pow(2, virtBits) - 1; // mask of 1s
-			cout << "mask: " << mask << endl;
-			virtualAddress &= mask;
-			cout << "virtual address: " << virtualAddress << endl; // off by 1. 48 instead of 96
-			int VPN = virtualAddress >> offset;
-			cout << "VPN: " << VPN << endl;
+			// cout << "mask: " << mask << endl;
+
+			int maskedVirtualAddress  = virtualAddress &= mask;//on purpose
+
+
+			// cout << "virtual address: " << maskedVirtualAddress << endl; // off by 1. 48 instead of 96
+			int VPN = maskedVirtualAddress >> offset;
+			// cout << "VPN: " << VPN << endl;
 			int PPN = TableRecords[VPN]->getPhysicalPageNumber();
+			// cout << "Respective PPN: " << PPN << endl;
 			int physicalAddress = PPN << offset;
+
+			// we need to get the actual offset value and  =|
+			// it with the shifted ppn (stored in var physicalAddress)
+
+
 			mask = pow(2, offset) - 1;
-			physicalAddress &= mask;
+			int offsetValue = virtualAddress & mask;
+
+
+			physicalAddress |= offsetValue;
+
+
+			if(TableRecords[VPN]->getPermissionBit()){
+				if(TableRecords[VPN]->getValidBit()){
+
+					if(hexFormat){
+							//print out in hex
+							cout << "PhysicalAddress: 0x" << hex << physicalAddress << endl;
+					}else{
+						cout << "PhysicalAddress: " << physicalAddress << endl;
+					}
+				}else{
+					cout << "DISK" << endl;
+				}
+			}else{
+				cout << "SEGFAULT" << endl;
+			}
 			return physicalAddress;
 	}
 
@@ -191,7 +228,7 @@ int main(int argc, char* argv[])
 	//make instance of TableRep
 	TableRep * tableRep =  ReadFile(input);
 
-	tableRep->printTable(cout);
+	// tableRep->printTable(cout);
 
 	//now we need to read in from cin, from the file redirected in
 
@@ -203,12 +240,16 @@ int main(int argc, char* argv[])
 		//int addrSize = address.length();
 		addr = -1;
 		physicalAddress = 0;
+		bool hex;
 		if(address.length() > 1){
 			//either hex or decimal addr
-			 	if(address[1] == 'x'){ //expecting the "0x" in front of the word
+
+				if(address[1] == 'x'){ //expecting the "0x" in front of the word
 					addr = stoi(address, nullptr, 16);
+					hex = true;
 		 		}else {
 					addr = stoi(address);
+					hex = false;
 				}
 		}else{
 			//we know this is specifically a newline char OR a single digit decimal based address
@@ -222,8 +263,13 @@ int main(int argc, char* argv[])
 			return 0;
 		}
 		// process input
-		physicalAddress = tableRep->translateAddress(addr);
-		cout << "phsyical address: " << physicalAddress << endl << endl;
+		physicalAddress = tableRep->translateAddress(addr, hex);
+		//cout << "phsyical address: " << physicalAddress << endl << endl;
+
+
+
+
+
 	}
 
 	return 0;
