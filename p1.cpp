@@ -10,7 +10,7 @@ Date: Spring '18
 //instructions make ZERO sense at all so we are going to use a command line argument
 //as means to how we are using the resource page table.
 
-
+#define PROB1 
 
 #include <iostream>
 #include <fstream>
@@ -28,59 +28,13 @@ class TableRep
 {
 public:
 
-
-	class TableEntry{
-	public:
-		TableEntry()
-		{
-			valid = false;
-			permission = false;
-			physicalPageNumber = -1; //so we know its a bad instance
-			useBit = false;//whatever the fuck that it
-		}
-
-		TableEntry(bool v, bool p, int pageNum, bool use)
-		{
-			valid =  v;
-			permission = p;
-			physicalPageNumber = pageNum;
-			useBit = use;
-
-		}
-		~TableEntry()
-		{}
-
-		TableEntry(const TableEntry & t)
-		{
-			valid = t.valid;
-			permission = t.permission;
-			physicalPageNumber = t.physicalPageNumber;
-			useBit = t.useBit;
-		}
-
-		void printEntry(ostream & o) {
-			o << valid << " " << permission << " " << physicalPageNumber << " " << useBit << endl;
-		}
-
-		int getPhysicalPageNumber() {
-			return physicalPageNumber;
-		}
-
-		bool getPermissionBit(){
-			return permission;
-		}
-
-		bool getValidBit(){
-			return valid;
-		}
-
-	private:
+	struct TableEntry{
 		bool valid;
 		bool permission;
 		int physicalPageNumber;
 		bool useBit;
-		//whatever else we need to keep track of this information.
 	};
+
 
 	TableRep()
 	{
@@ -88,6 +42,7 @@ public:
 		physBits = 0;
 		bytesInPage = 0;
 		offset = 0;
+		clock = 0;
 		// bitsInPage
 	}
 
@@ -96,6 +51,7 @@ public:
 		physBits = p;
 		bytesInPage = b;
 		offset = log2(bytesInPage);
+		clock = 0;
 		// bitsInpage = log2(bytesInPage);
 		// TableRecords = other;
 	}
@@ -109,8 +65,35 @@ public:
 	}
 
 	void insertTableEntry(bool v, bool p, int pageNum, bool use) {
-		TableEntry* te = new TableEntry( v,  p,  pageNum,  use);
+		TableEntry* te = new TableEntry{v,  p,  pageNum,  use};
 		TableRecords.push_back(te);
+	}
+
+	void pageReplacement(int vpn) { // valid bit 0 at this vpn
+		// decide which entry to replace
+		// check the entry the clock points 
+		if (TableRecords[clock]->useBit) {
+			incrementClock(); // after this function call, the clock points to the next valid entry
+			pageReplacement(vpn);
+		}
+		else {
+			// if the use bit is zero, do the replacement.
+			TableRecords[vpn]->valid = TableRecords[clock]->valid;
+			TableRecords[vpn]->permission = TableRecords[clock]->permission;
+			TableRecords[vpn]->physicalPageNumber = TableRecords[clock]->physicalPageNumber;
+			TableRecords[vpn]->useBit = true;
+			TableRecords[clock]->valid = false;
+			incrementClock();
+		}
+	}
+
+	void incrementClock(){//vpn of new virt address as param
+		TableRecords[clock]->useBit = false;
+		clock = (clock + 1) % TableRecords.size();
+		while (!TableRecords[clock]->valid || !TableRecords[clock]->permission) {
+			// entry is invalid, move on to the next one.
+			clock = (clock + 1) % TableRecords.size();
+		}
 	}
 
 	vector<TableEntry *> getTableRecords()
@@ -120,6 +103,10 @@ public:
 
 	int getSize(){
 		return TableRecords.size();
+	}
+
+	int getOffSet(){
+		return offset;
 	}
 
 	int getBytesInPage(){
@@ -136,57 +123,12 @@ public:
 
 	void printTable(ostream & o) {
 		for (int i = 0; i < TableRecords.size(); i++) {
-			TableRecords[i]->printEntry(o);
+			// TableRecords[i]->printEntry(o);
+			cout << TableRecords[i]->valid << " " << TableRecords[i]->permission << " " << TableRecords[i]->physicalPageNumber << " " << TableRecords[i]->useBit << endl;
 		}
 	}
 
-	int translateAddress(int virtualAddress, bool hexFormat) {
-			// calculate VPN
-			// index the table
-			// offset to find specific address within PPN
-			// return PPN
 
-			int mask = pow(2, virtBits) - 1; // mask of 1s
-			// cout << "mask: " << mask << endl;
-
-			int maskedVirtualAddress  = virtualAddress &= mask;//on purpose
-
-
-			// cout << "virtual address: " << maskedVirtualAddress << endl; // off by 1. 48 instead of 96
-			int VPN = maskedVirtualAddress >> offset;
-			// cout << "VPN: " << VPN << endl;
-			int PPN = TableRecords[VPN]->getPhysicalPageNumber();
-			// cout << "Respective PPN: " << PPN << endl;
-			int physicalAddress = PPN << offset;
-
-			// we need to get the actual offset value and  =|
-			// it with the shifted ppn (stored in var physicalAddress)
-
-
-			mask = pow(2, offset) - 1;
-			int offsetValue = virtualAddress & mask;
-
-
-			physicalAddress |= offsetValue;
-
-
-			if(TableRecords[VPN]->getPermissionBit()){
-				if(TableRecords[VPN]->getValidBit()){
-
-					if(hexFormat){
-							//print out in hex
-							cout << "PhysicalAddress: 0x" << hex << physicalAddress << endl;
-					}else{
-						cout << "PhysicalAddress: " << physicalAddress << endl;
-					}
-				}else{
-					cout << "DISK" << endl;
-				}
-			}else{
-				cout << "SEGFAULT" << endl;
-			}
-			return physicalAddress;
-	}
 
 private:
 	int virtBits; // bitwidths of the addresses
@@ -195,6 +137,7 @@ private:
 	int offset; // bitwidth of the offset
 	// bitsInpage = log2(bytesInPage);
 	vector<TableEntry*> TableRecords;
+	int clock;
 	//TableEntry* TableRecords[];
 /*
 Number of bits in virtual address
@@ -209,6 +152,8 @@ Use bit (see Problem 2)
 };
 
 TableRep * ReadFile(ifstream & input);
+int translateAddress(TableRep * t, int virtualAddress, bool hexFormat);
+
 
 //physAddress parseVirtAddress(int address, bool hex, TableRep * & T);
 
@@ -235,12 +180,13 @@ int main(int argc, char* argv[])
 	string address = "";
 	int addr = -1;
 	int physicalAddress = 0;
+	bool hex;
 	while(cin >> address)//each result should be a virtual address we need to interpret based off tableRep,
 	{
 		//int addrSize = address.length();
 		addr = -1;
 		physicalAddress = 0;
-		bool hex;
+		
 		if(address.length() > 1){
 			//either hex or decimal addr
 
@@ -257,19 +203,14 @@ int main(int argc, char* argv[])
 				addr = stoi(address);
 			}
 		}
-		cout << "virtual addr: " << addr << endl;
+		cout << "Virtual Address: " << addr << endl;
 		if(addr < 0) {
 			cout << "invalid address" << endl;
 			return 0;
 		}
 		// process input
-		physicalAddress = tableRep->translateAddress(addr, hex);
+		physicalAddress = translateAddress(tableRep, addr, hex);
 		//cout << "phsyical address: " << physicalAddress << endl << endl;
-
-
-
-
-
 	}
 
 	return 0;
@@ -280,6 +221,62 @@ int main(int argc, char* argv[])
 
 //should probably use bit shifts maybe shift off the bits of the page to determine value in addr.
 
+int translateAddress(TableRep * table, int virtualAddress, bool hexFormat) {
+		// calculate VPN
+		// index the table
+		// offset to find specific address within PPN
+		// return PPN
+
+
+		int mask = pow(2, table->getVirtBits()) - 1; // mask of 1s
+		// cout << "mask: " << mask << endl;
+
+		int maskedVirtualAddress  = virtualAddress &= mask;//on purpose
+
+		// cout << "virtual address: " << maskedVirtualAddress << endl; // off by 1. 48 instead of 96
+		int VPN = maskedVirtualAddress >> table->getOffSet();
+		// cout << "VPN: " << VPN << endl;
+		int PPN = table->getTableRecords()[VPN]->physicalPageNumber;
+		// cout << "Respective PPN: " << PPN << endl;
+		int physicalAddress = PPN << table->getOffSet();
+
+		// we need to get the actual offset value and  =|
+		// it with the shifted ppn (stored in var physicalAddress)
+
+
+		mask = pow(2, table->getOffSet()) - 1;
+		int offsetValue = virtualAddress & mask;
+
+
+		physicalAddress |= offsetValue;
+
+
+		if(table->getTableRecords()[VPN]->permission){
+			if(table->getTableRecords()[VPN]->valid){
+
+				if(hexFormat){
+						//print out in hex
+					cout << "printing hex address" << endl;
+					cout << "Physical Address: 0x" << hex << physicalAddress << endl;
+				}else{
+					cout << "Physical Address: " << physicalAddress << endl;
+				}
+			}else{
+				
+				#ifdef PROB1
+				//preprocessor directive Prob1
+				cout << "DISK" << endl;
+				#else
+				//preprocessor directive Prob2
+				table->pageReplacement(VPN);
+				cout << "finished page replacement" << endl;
+				#endif
+			}
+		}else{
+			cout << "SEGFAULT" << endl;
+		}
+		return physicalAddress;
+}
 
 TableRep * ReadFile(ifstream & input)
 {
