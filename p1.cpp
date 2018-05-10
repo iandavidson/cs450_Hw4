@@ -5,12 +5,6 @@ Assignment: HW 4
 Date: Spring '18
 */
 
-
-
-//instructions make ZERO sense at all so we are going to use a command line argument
-//as means to how we are using the resource page table.
-
-
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
@@ -51,8 +45,6 @@ public:
 		bytesInPage = b;
 		offset = log2(bytesInPage);
 		clock = 0;
-		// bitsInpage = log2(bytesInPage);
-		// TableRecords = other;
 	}
 
 	~TableRep(){
@@ -87,6 +79,7 @@ public:
 	}
 
 	void incrementClock(){//vpn of new virt address as param
+
 		TableRecords[clock]->useBit = false;
 		clock = (clock + 1) % TableRecords.size();
 		while (!TableRecords[clock]->valid || !TableRecords[clock]->permission) {
@@ -122,7 +115,6 @@ public:
 
 	void printTable(ostream & o) {
 		for (int i = 0; i < TableRecords.size(); i++) {
-			// TableRecords[i]->printEntry(o);
 			cout << TableRecords[i]->valid << " " << TableRecords[i]->permission << " " << TableRecords[i]->physicalPageNumber << " " << TableRecords[i]->useBit << endl;
 		}
 	}
@@ -153,9 +145,6 @@ Use bit (see Problem 2)
 TableRep * ReadFile(ifstream & input);
 int translateAddress(TableRep * t, int virtualAddress, bool hexFormat);
 
-
-//physAddress parseVirtAddress(int address, bool hex, TableRep * & T);
-
 int main(int argc, char* argv[])
 {
 	if(argc != 2){ //exe + inputfile
@@ -172,7 +161,9 @@ int main(int argc, char* argv[])
 	//make instance of TableRep
 	TableRep * tableRep =  ReadFile(input);
 
-	// tableRep->printTable(cout);
+	cout << "Starting Table:" << endl;
+	tableRep->printTable(cout);
+	cout << endl << endl;
 
 	//now we need to read in from cin, from the file redirected in
 
@@ -202,7 +193,11 @@ int main(int argc, char* argv[])
 				addr = stoi(address);
 			}
 		}
-		cout << "Virtual Address: " << addr << endl;
+		if(hex){
+			cout << "Virtual Address: 0x" << std::hex << addr << endl;
+		}	else {
+			cout << "Virtual Address: " << addr << endl;
+		}
 		if(addr < 0) {
 			cout << "invalid address" << endl;
 			return 0;
@@ -210,13 +205,14 @@ int main(int argc, char* argv[])
 		// process input
 		physicalAddress = translateAddress(tableRep, addr, hex);
 		//cout << "phsyical address: " << physicalAddress << endl << endl;
+		cout << endl;
 	}
+
+	cout << endl << "Final Table:" << endl;
+	tableRep->printTable(cout);
 
 	return 0;
 }
-
-// parseVirtAddress(int address, bool hex, TableRep * & T){}
-// should return the phsyical address or 0(if permission is )
 
 //should probably use bit shifts maybe shift off the bits of the page to determine value in addr.
 
@@ -230,7 +226,7 @@ int translateAddress(TableRep * table, int virtualAddress, bool hexFormat) {
 		int mask = pow(2, table->getVirtBits()) - 1; // mask of 1s
 		// cout << "mask: " << mask << endl;
 
-		int maskedVirtualAddress  = virtualAddress &= mask;//on purpose
+		int maskedVirtualAddress = virtualAddress &= mask;//on purpose
 
 		// cout << "virtual address: " << maskedVirtualAddress << endl; // off by 1. 48 instead of 96
 		int VPN = maskedVirtualAddress >> table->getOffSet();
@@ -255,7 +251,6 @@ int translateAddress(TableRep * table, int virtualAddress, bool hexFormat) {
 
 				if(hexFormat){
 						//print out in hex
-					cout << "printing hex address" << endl;
 					cout << "Physical Address: 0x" << hex << physicalAddress << endl;
 				}else{
 					cout << "Physical Address: " << physicalAddress << endl;
@@ -269,7 +264,6 @@ int translateAddress(TableRep * table, int virtualAddress, bool hexFormat) {
 				//preprocessor directive Prob2
 				table->pageReplacement(VPN);
 				cout << "finished page replacement" << endl;
-
 				return translateAddress(table, virtualAddress, hexFormat);
 				#endif
 			}
@@ -327,6 +321,6 @@ TableRep * ReadFile(ifstream & input)
 		TR->insertTableEntry(valid, per, phy, use);
 		word = "";
 	}
-
+	TR->incrementClock(); // increment clock to prevent cold start
 	return TR;
 }
