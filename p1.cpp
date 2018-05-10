@@ -10,7 +10,6 @@ Date: Spring '18
 //instructions make ZERO sense at all so we are going to use a command line argument
 //as means to how we are using the resource page table.
 
-#define PROB1 
 
 #include <iostream>
 #include <fstream>
@@ -71,7 +70,7 @@ public:
 
 	void pageReplacement(int vpn) { // valid bit 0 at this vpn
 		// decide which entry to replace
-		// check the entry the clock points 
+		// check the entry the clock points
 		if (TableRecords[clock]->useBit) {
 			incrementClock(); // after this function call, the clock points to the next valid entry
 			pageReplacement(vpn);
@@ -186,7 +185,7 @@ int main(int argc, char* argv[])
 		//int addrSize = address.length();
 		addr = -1;
 		physicalAddress = 0;
-		
+
 		if(address.length() > 1){
 			//either hex or decimal addr
 
@@ -262,7 +261,7 @@ int translateAddress(TableRep * table, int virtualAddress, bool hexFormat) {
 					cout << "Physical Address: " << physicalAddress << endl;
 				}
 			}else{
-				
+
 				#ifdef PROB1
 				//preprocessor directive Prob1
 				cout << "DISK" << endl;
@@ -270,6 +269,8 @@ int translateAddress(TableRep * table, int virtualAddress, bool hexFormat) {
 				//preprocessor directive Prob2
 				table->pageReplacement(VPN);
 				cout << "finished page replacement" << endl;
+
+				return translateAddress(table, virtualAddress, hexFormat);
 				#endif
 			}
 		}else{
